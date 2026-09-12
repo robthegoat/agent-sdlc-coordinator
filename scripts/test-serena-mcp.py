@@ -6,18 +6,22 @@ actually work against real source, not just that the server connects.
 
 Run with: uv run --with mcp python3 scripts/test-serena-mcp.py
 
-TARGET_PROJECT points at whatever repo has real code to query against —
-this template repo itself has none yet. Swap it for any local repo with
-a real Python function to reproduce.
+Queries this script's own `main` function within this repo — the repo
+had no source at all until this script existed, so this is now the
+"real symbol-level query against this repo's own code" the task asks
+for, not a substitute repo. Portable: TARGET_PROJECT is derived from
+this file's own location, not hardcoded to one machine/user.
 """
 
 import asyncio
+from pathlib import Path
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-TARGET_PROJECT = "/Users/bryant/Projects/dev/kinetic-kings-data-platform"
-TARGET_SYMBOL = "query_shopify_graphql"
-TARGET_FILE = "etl/shopify_products.py"
+TARGET_PROJECT = str(Path(__file__).resolve().parent.parent)
+TARGET_SYMBOL = "main"
+TARGET_FILE = "scripts/test-serena-mcp.py"
 
 
 async def main():

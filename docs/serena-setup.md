@@ -33,36 +33,35 @@ This matters for the coordinator's own lifecycle (`docs/process.md`): the coordi
 
 ## Verifying it actually works (not just "connected")
 
-Because this template repo has no real source code yet, indexing it directly proves nothing interesting:
+`scripts/test-serena-mcp.py` (added by this same task) is a direct MCP client — it speaks the stdio protocol to Serena's server itself, bypassing the Claude Code tool layer entirely, so it tests the server rather than Claude Code's integration with it. Run it with:
 
 ```bash
-cd ~/agent-sdlc-coordinator
-uvx --from git+https://github.com/oraios/serena serena project index . --name agent-sdlc-coordinator
-# → "No source files for supported language servers were found ... Indexed files per language:" (0 files)
+uv run --with mcp python3 scripts/test-serena-mcp.py
 ```
 
-That's the honest, expected result for a repo with only markdown in it.
-
-To prove the underlying symbol-level engine genuinely works, it was exercised against a repo with real code (`kinetic-kings-data-platform`, a separate project on this machine) via a direct MCP client script (bypassing the Claude Code tool layer entirely, to test the server itself):
+It queries its own `main` function, within this same repo:
 
 ```python
-# minimal MCP stdio client — full script at scripts/test-serena-mcp.py
 result = await session.call_tool("find_symbol", {
-    "name_path": "query_shopify_graphql",
-    "relative_path": "etl/shopify_products.py",
+    "name_path": "main",
+    "relative_path": "scripts/test-serena-mcp.py",
     "include_body": True,
 })
-# → returns the real function body, lines 16-19, verbatim
+# → returns the real function body verbatim, starting at (0-indexed) line 26
+#   — line 27 in a normal 1-indexed editor/grep view, i.e. `async def main():`
 
 refs = await session.call_tool("find_referencing_symbols", {
-    "name_path": "query_shopify_graphql",
-    "relative_path": "etl/shopify_products.py",
+    "name_path": "main",
+    "relative_path": "scripts/test-serena-mcp.py",
 })
-# → correctly finds the one real call site, at etl/shopify_products.py:71
+# → correctly finds the one real call site, at (0-indexed) line 68
+#   — line 69 in a 1-indexed view, i.e. `asyncio.run(main())`
 ```
 
-Both calls returned exactly correct, verifiable results — real LSP-backed symbol retrieval and reference-finding, not a canned response. Language server used: `pyright` (Python), started automatically by Serena.
+Both calls returned exactly correct, verifiable results against this repo's own code — real LSP-backed symbol retrieval and reference-finding, not a canned response. Language server used: `pyright` (Python), started automatically by Serena.
+
+**Note on line numbers:** Serena's tool output uses 0-indexed line numbers (LSP convention). Every number quoted above has been cross-checked against `grep -n` (1-indexed) on the actual file — don't assume the two match without converting.
 
 ## Current state of this repo's Serena config
 
-`serena project index .` auto-generated `.serena/project.yml` (versioned — it's Serena's standard project config, `language_servers: []` until this repo has real source code to index) and `.serena/.gitignore` (Serena's own recommended excludes: `/cache` and `/project.local.yml`, both machine-local and correctly not versioned).
+Once `scripts/test-serena-mcp.py` existed, re-running `serena project index . --language python` picked it up (`Indexed files per language: python=1`) and generated `.serena/project.yml` with `language_servers: [python]` — versioned, since Serena's own `.serena/.gitignore` only excludes `/cache` and `/project.local.yml` (both machine-local).
